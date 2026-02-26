@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nuclear Binding Energy Curve</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e18;
+    --bg2: #111827;
+    --bg3: #1a2236;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --border: rgba(255,255,255,0.08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+  .container { max-width: 1140px; margin: 0 auto; }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(20px, 3.5vw, 34px);
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  /* Controls row */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .btn {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.18s;
+    letter-spacing: 0.3px;
+    user-select: none;
+  }
+  .btn.active { color: var(--text); }
+  .btn.t-iron.active   { color: #f59e0b; border-color: #f59e0b; background: rgba(245,158,11,0.08); }
+  .btn.t-lead.active   { color: #60a5fa; border-color: #60a5fa; background: rgba(96,165,250,0.08); }
+  .btn.t-uran.active   { color: #f87171; border-color: #f87171; background: rgba(248,113,113,0.08); }
+  .btn.t-reg.active    { color: #34d399; border-color: #34d399; background: rgba(52,211,153,0.06); }
+  .btn.t-pot.active    { color: #c084fc; border-color: #c084fc; background: rgba(192,132,252,0.06); }
+  .btn.t-magic.active  { color: #fb923c; border-color: #fb923c; background: rgba(251,146,60,0.06); }
+
+  .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+
+  .zoom-hint {
+    text-align: center;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+  }
+  .zoom-hint span { color: #60a5fa; }
+
+  /* Chart */
+  .chart-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 16px 16px 16px;
+    position: relative;
+    user-select: none;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    cursor: crosshair;
+  }
+  canvas.panning { cursor: grabbing; }
+
+  /* Zoom controls */
+  .zoom-btns {
+    position: absolute;
+    top: 28px;
+    right: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .zbtn {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--text);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .zbtn:hover { background: rgba(255,255,255,0.1); }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute;
+    background: rgba(8,12,22,0.96);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 11px;
+    pointer-events: none;
+    display: none;
+    z-index: 20;
+    min-width: 150px;
+    line-height: 1.7;
+  }
+  #tooltip .tip-name { font-weight: 600; color: #e2e8f0; }
+  #tooltip .tip-a    { color: #94a3b8; font-size: 10px; }
+  #tooltip .tip-be   { color: #f59e0b; }
+  #tooltip .tip-note { color: #94a3b8; font-size: 9px; margin-top: 2px; }
+
+  /* Info cards */
+  .info-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .icard {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 12px 14px;
+  }
+  .icard .lbl { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .icard .val { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
+  .icard .dsc { font-size: 10px; color: var(--muted); line-height: 1.55; }
+  .c-iron .val { color: #f59e0b; }
+  .c-lead .val { color: #60a5fa; }
+  .c-uran .val { color: #f87171; }
+  .c-tip  .val { color: #a78bfa; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Nuclear Binding Energy Curve</h1>
+<p class="subtitle">Binding energy per nucleon vs. mass number — the landscape of nuclear stability</p>
+
+<div class="controls">
+  <button class="btn t-iron  active" onclick="tog('iron',this)">⭐ Fe-56 global min</button>
+  <button class="btn t-lead  active" onclick="tog('lead',this)">◆ Pb-207 local min</button>
+  <button class="btn t-uran  active" onclick="tog('uran',this)">☢ U-235 / Pu-239</button>
+  <button class="btn t-magic active" onclick="tog('magic',this)">✦ Magic numbers</button>
+  <div class="sep"></div>
+  <button class="btn t-reg   active" onclick="tog('reg',this)">Fusion/Fission regions</button>
+  <button class="btn t-pot   active" onclick="tog('pot',this)">Potential energy view</button>
+</div>
+
+<p class="zoom-hint">
+  <span>Scroll</span> to zoom · <span>Drag</span> to pan · <span>Double-click</span> to reset view
+</p>
+
+<div class="chart-wrap" id="wrap">
+  <div id="tooltip">
+    <div class="tip-name" id="tn"></div>
+    <div class="tip-a"    id="ta"></div>
+    <div class="tip-be"   id="tb"></div>
+    <div class="tip-note" id="tnt"></div>
+  </div>
+  <div class="zoom-btns">
+    <div class="zbtn" onclick="zoomStep(1.4)">+</div>
+    <div class="zbtn" onclick="zoomStep(1/1.4)">−</div>
+    <div class="zbtn" style="font-size:11px" onclick="resetView()">⌂</div>
+  </div>
+  <canvas id="c" height="480"></canvas>
+</div>
+
+<div class="info-panel">
+  <div class="icard c-iron">
+    <div class="lbl">Global Minimum</div>
+    <div class="val">Iron-56 · 8.79 MeV/nucleon</div>
+    <div class="dsc">True nuclear ground state. All stellar nucleosynthesis terminates here. Stars cannot release energy by fusing beyond iron.</div>
+  </div>
+  <div class="icard c-lead">
+    <div class="lbl">Local Minimum — U-235 chain endpoint</div>
+    <div class="val">Lead-207 · 7.87 MeV/nucleon</div>
+    <div class="dsc">More stable than uranium but not the true ground state. The potential barrier to iron is insurmountably high on any observable timescale.</div>
+  </div>
+  <div class="icard c-uran">
+    <div class="lbl">Starting point — high potential energy</div>
+    <div class="val">U-235 · 7.59 MeV/nucleon</div>
+    <div class="dsc">Rolls down ~15 α/β/γ resets toward Pb-207. Fission jumps ~200 MeV toward the iron valley by splitting into mid-mass fragments.</div>
+  </div>
+  <div class="icard c-tip">
+    <div class="lbl">Zoom tip</div>
+    <div class="val">Scroll to explore local structure</div>
+    <div class="dsc">Zoom into the iron peak region to see Ni-62 competing with Fe-56. Zoom the Pb region to see the local minimum clearly.</div>
+  </div>
+</div>
+
+</div>
+<script>
+// ── Nuclide data ──────────────────────────────────────────────────────────
+const DATA = [
+  {a:1,  s:"H-1",   be:0.00},
+  {a:2,  s:"H-2",   be:1.11},
+  {a:3,  s:"He-3",  be:2.57},
+  {a:4,  s:"He-4",  be:7.07, note:"α particle — doubly magic, unusually stable"},
+  {a:6,  s:"Li-6",  be:5.33},
+  {a:7,  s:"Li-7",  be:5.61},
+  {a:8,  s:"Be-8",  be:7.06},
+  {a:9,  s:"Be-9",  be:6.46},
+  {a:10, s:"B-10",  be:6.48},
+  {a:11, s:"B-11",  be:6.93},
+  {a:12, s:"C-12",  be:7.68},
+  {a:14, s:"N-14",  be:7.48},
+  {a:16, s:"O-16",  be:7.98, note:"Doubly magic nucleus"},
+  {a:20, s:"Ne-20", be:8.03},
+  {a:24, s:"Mg-24", be:8.26},
+  {a:27, s:"Al-27", be:8.33},
+  {a:28, s:"Si-28", be:8.45},
+  {a:31, s:"P-31",  be:8.48},
+  {a:32, s:"S-32",  be:8.49},
+  {a:36, s:"Ar-36", be:8.52},
+  {a:40, s:"Ca-40", be:8.55, note:"Doubly magic nucleus (Z=20, N=20)"},
+  {a:48, s:"Ca-48", be:8.67, note:"Doubly magic nucleus (Z=20, N=28)"},
+  {a:50, s:"Cr-50", be:8.70},
+  {a:52, s:"Cr-52", be:8.78},
+  {a:54, s:"Fe-54", be:8.74},
+  {a:56, s:"Fe-56", be:8.79, note:"Global binding energy maximum — nuclear ground state"},
+  {a:58, s:"Fe-58", be:8.79},
+  {a:60, s:"Ni-60", be:8.78},
+  {a:62, s:"Ni-62", be:8.795,note:"Slightly higher BE/A than Fe-56 by some measures"},
+  {a:64, s:"Ni-64", be:8.78},
+  {a:63, s:"Cu-63", be:8.75},
+  {a:65, s:"Cu-65", be:8.76},
+  {a:66, s:"Zn-66", be:8.76},
+  {a:70, s:"Ge-70", be:8.73},
+  {a:75, s:"As-75", be:8.70},
+  {a:80, s:"Se-80", be:8.71},
+  {a:84, s:"Kr-84", be:8.72},
+  {a:88, s:"Sr-88", be:8.73},
+  {a:89, s:"Y-89",  be:8.71},
+  {a:90, s:"Zr-90", be:8.71},
+  {a:93, s:"Nb-93", be:8.66},
+  {a:96, s:"Mo-96", be:8.66},
+  {a:100,s:"Ru-100",be:8.64},
+  {a:103,s:"Rh-103",be:8.63},
+  {a:106,s:"Pd-106",be:8.62},
+  {a:107,s:"Ag-107",be:8.55},
+  {a:112,s:"Cd-112",be:8.55},
+  {a:115,s:"In-115",be:8.52},
+  {a:120,s:"Sn-120",be:8.50, note:"Z=50 magic number — extra stability"},
+  {a:127,s:"I-127", be:8.44},
+  {a:130,s:"Te-130",be:8.41},
+  {a:132,s:"Xe-132",be:8.40},
+  {a:137,s:"Ba-137",be:8.38},
+  {a:138,s:"Ba-138",be:8.39},
+  {a:139,s:"La-139",be:8.37},
+  {a:140,s:"Ce-140",be:8.38},
+  {a:141,s:"Pr-141",be:8.36},
+  {a:142,s:"Nd-142",be:8.34},
+  {a:144,s:"Nd-144",be:8.32},
+  {a:147,s:"Sm-147",be:8.27},
+  {a:152,s:"Sm-152",be:8.27},
+  {a:153,s:"Eu-153",be:8.22},
+  {a:156,s:"Gd-156",be:8.21},
+  {a:159,s:"Tb-159",be:8.18},
+  {a:164,s:"Dy-164",be:8.19},
+  {a:165,s:"Ho-165",be:8.17},
+  {a:166,s:"Er-166",be:8.16},
+  {a:169,s:"Tm-169",be:8.12},
+  {a:174,s:"Yb-174",be:8.11},
+  {a:175,s:"Lu-175",be:8.09},
+  {a:180,s:"Hf-180",be:8.07},
+  {a:181,s:"Ta-181",be:8.08},
+  {a:184,s:"W-184", be:8.08},
+  {a:187,s:"Re-187",be:8.07},
+  {a:192,s:"Os-192",be:8.04},
+  {a:193,s:"Ir-193",be:8.02},
+  {a:195,s:"Pt-195",be:8.01},
+  {a:197,s:"Au-197",be:7.92},
+  {a:202,s:"Hg-202",be:7.93},
+  {a:204,s:"Pb-204",be:7.88},
+  {a:205,s:"Tl-205",be:7.89},
+  {a:206,s:"Pb-206",be:7.88},
+  {a:207,s:"Pb-207",be:7.87, note:"U-235 decay chain endpoint — local minimum"},
+  {a:208,s:"Pb-208",be:7.87, note:"Doubly magic (Z=82, N=126) — extra stability in this region"},
+  {a:209,s:"Bi-209",be:7.85},
+  {a:210,s:"Po-210",be:7.83},
+  {a:211,s:"Bi-211",be:7.82},
+  {a:214,s:"Pb-214",be:7.78},
+  {a:218,s:"Po-218",be:7.75},
+  {a:222,s:"Rn-222",be:7.72},
+  {a:226,s:"Ra-226",be:7.66},
+  {a:227,s:"Ac-227",be:7.65},
+  {a:230,s:"Th-230",be:7.63},
+  {a:231,s:"Pa-231",be:7.62},
+  {a:232,s:"Th-232",be:7.62},
+  {a:233,s:"U-233", be:7.60},
+  {a:234,s:"U-234", be:7.60},
+  {a:235,s:"U-235", be:7.591,note:"U-235 — start of 15-step decay chain to Pb-207"},
+  {a:238,s:"U-238", be:7.570},
+  {a:239,s:"Pu-239",be:7.560,note:"Pu-239 — fissile, used in nuclear weapons/reactors"},
+  {a:240,s:"Pu-240",be:7.556},
+  {a:244,s:"Pu-244",be:7.520},
+];
+DATA.sort((a,b)=>a.a-b.a);
+
+// Magic number nuclei to highlight
+const MAGIC_A = [4, 16, 40, 48, 120, 208];
+
+// Special named nuclei
+const SPECIAL = {
+  56:  {color:'#f59e0b', label:'Fe-56'},
+  62:  {color:'#fbbf24', label:'Ni-62'},
+  4:   {color:'#a78bfa', label:'He-4'},
+  207: {color:'#60a5fa', label:'Pb-207'},
+  208: {color:'#93c5fd', label:'Pb-208'},
+  235: {color:'#f87171', label:'U-235'},
+  239: {color:'#fca5a5', label:'Pu-239'},
+};
+
+// ── Toggles ───────────────────────────────────────────────────────────────
+const T = { iron:true, lead:true, uran:true, reg:true, pot:true, magic:true };
+function tog(k, el) {
+  T[k] = !T[k];
+  el.classList.toggle('active', T[k]);
+  draw();
+}
+
+// ── Canvas & zoom state ───────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('wrap');
+const tip    = document.getElementById('tooltip');
+
+// View state: what A range and BE range to show
+let view = { aMin:1, aMax:245, beMin:-0.2, beMax:9.6 };
+let baseView = { ...view };
+
+// Pan state
+let isPanning = false;
+let panStart  = null;
+let panView   = null;
+
+function resetView() { view = { ...baseView }; draw(); }
+function zoomStep(factor) {
+  const aMid  = (view.aMin + view.aMax) / 2;
+  const beMid = (view.beMin + view.beMax) / 2;
+  const aHalf  = (view.aMax  - view.aMin)  / 2 / factor;
+  const beHalf = (view.beMax - view.beMin) / 2 / factor;
+  view = { aMin: aMid-aHalf, aMax: aMid+aHalf, beMin: beMid-beHalf, beMax: beMid+beHalf };
+  clampView();
+  draw();
+}
+
+function clampView() {
+  const aSpan  = Math.max(view.aMax  - view.aMin,  5);
+  const beSpan = Math.max(view.beMax - view.beMin, 0.3);
+  view.aMin  = Math.max(view.aMin,  0);
+  view.aMax  = Math.min(view.aMax,  250);
+  view.beMin = Math.max(view.beMin, -0.5);
+  view.beMax = Math.min(view.beMax, 9.8);
+}
+
+// ── Layout helpers ────────────────────────────────────────────────────────
+const PAD = { top:36, right:44, bottom:52, left:58 };
+
+function plotSize() {
+  const W = canvas.width  / (window.devicePixelRatio||1);
+  const H = canvas.height / (window.devicePixelRatio||1);
+  return { W, H, pw: W-PAD.left-PAD.right, ph: H-PAD.top-PAD.bottom };
+}
+
+function toScreen(a, be) {
+  const {W,H,pw,ph} = plotSize();
+  const displayBE = T.pot ? (view.beMax + view.beMin - be) : be;
+  const x = PAD.left + (a - view.aMin)  / (view.aMax  - view.aMin)  * pw;
+  const y = PAD.top  + (1 - (displayBE - view.beMin) / (view.beMax - view.beMin)) * ph;
+  return {x, y};
+}
+
+function fromScreen(sx, sy) {
+  const {pw,ph} = plotSize();
+  const a  = view.aMin + (sx - PAD.left) / pw * (view.aMax  - view.aMin);
+  const beRaw = view.beMin + (1 - (sy - PAD.top) / ph) * (view.beMax - view.beMin);
+  const be = T.pot ? (view.beMax + view.beMin - beRaw) : beRaw;
+  return {a, be};
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────
+function draw() {
+  const dpr = window.devicePixelRatio || 1;
+  const {W, H, pw, ph} = plotSize();
+  ctx.clearRect(0,0,W*dpr,H*dpr);
+
+  // Background
+  ctx.fillStyle = '#111827';
+  ctx.fillRect(0,0,W,H);
+
+  // Clip to plot area
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(PAD.left, PAD.top, pw, ph);
+  ctx.clip();
+
+  // ── Fusion/fission regions ──────────────────────────────────────────
+  if (T.reg) {
+    const ironS = toScreen(56, 0);
+    const x0 = toScreen(view.aMin, 0).x;
+    const x1 = toScreen(view.aMax, 0).x;
+
+    ctx.fillStyle = 'rgba(52,211,153,0.045)';
+    ctx.fillRect(x0, PAD.top, ironS.x - x0, ph);
+
+    ctx.fillStyle = 'rgba(251,146,60,0.045)';
+    ctx.fillRect(ironS.x, PAD.top, x1 - ironS.x, ph);
+  }
+
+  // ── Grid ──────────────────────────────────────────────────────────────
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+
+  // Horizontal grid lines at whole MeV values
+  for (let be = Math.ceil(view.beMin); be <= Math.floor(view.beMax); be++) {
+    const {y} = toScreen(view.aMin, be);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left+pw, y); ctx.stroke();
+  }
+
+  // Vertical grid lines at A multiples of 20
+  const aStep = (view.aMax - view.aMin) > 80 ? 40 : (view.aMax - view.aMin) > 30 ? 20 : 10;
+  for (let a = Math.ceil(view.aMin/aStep)*aStep; a <= view.aMax; a += aStep) {
+    const {x} = toScreen(a, 0);
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top+ph); ctx.stroke();
+  }
+
+  // ── Magic number vertical guides ─────────────────────────────────────
+  if (T.magic) {
+    ctx.setLineDash([3,4]);
+    ctx.strokeStyle = 'rgba(251,146,60,0.25)';
+    ctx.lineWidth = 1;
+    for (const ma of MAGIC_A) {
+      if (ma >= view.aMin && ma <= view.aMax) {
+        const {x} = toScreen(ma, 0);
+        ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top+ph); ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]);
+  }
+
+  // ── Main curve ─────────────────────────────────────────────────────────
+  // Filter visible data
+  const visible = DATA.filter(n => n.a >= view.aMin - 2 && n.a <= view.aMax + 2);
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#7dd3fc';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = 'rgba(125,211,252,0.25)';
+  ctx.shadowBlur = 5;
+  let first = true;
+  for (const n of visible) {
+    const {x,y} = toScreen(n.a, n.be);
+    if (first) { ctx.moveTo(x,y); first=false; } else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // ── Tiny dots — very small, only color-coded special ones are larger ──
+  for (const n of visible) {
+    const {x, y} = toScreen(n.a, n.be);
+    const isMagic = T.magic && MAGIC_A.includes(n.a);
+    const isSpecial = SPECIAL[n.a];
+
+    if (isSpecial) {
+      // Special elements: colored dot, no label (label drawn separately)
+      const r = (n.a===56||n.a===207||n.a===235) ? 4.5 : 3;
+      ctx.beginPath();
+      ctx.arc(x, y, r+3, 0, Math.PI*2);
+      ctx.fillStyle = isSpecial.color.replace(')', ',0.15)').replace('#','rgba(').replace('rgba(','rgba(');
+      // simpler glow
+      ctx.fillStyle = hexToRgba(isSpecial.color, 0.18);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI*2);
+      ctx.fillStyle = isSpecial.color;
+      ctx.fill();
+    } else if (isMagic) {
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI*2);
+      ctx.fillStyle = '#fb923c';
+      ctx.fill();
+    } else {
+      // Normal dot — 1.2px radius
+      ctx.beginPath();
+      ctx.arc(x, y, 1.2, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(125,211,252,0.45)';
+      ctx.fill();
+    }
+  }
+
+  // ── Labels for special nuclei (only if on screen and not too crowded) ─
+  const labeledA = new Set();
+
+  function drawLabel(a, be, color, text, offsetX, offsetY) {
+    const {x,y} = toScreen(a, be);
+    if (x < PAD.left-5 || x > PAD.left+pw+5) return;
+    ctx.fillStyle = color;
+    ctx.font = `bold 10px JetBrains Mono`;
+    ctx.textAlign = offsetX > 0 ? 'left' : offsetX < 0 ? 'right' : 'center';
+    ctx.fillText(text, x + offsetX, y + offsetY);
+    labeledA.add(a);
+  }
+
+  if (T.iron) {
+    const n = DATA.find(d=>d.a===56);
+    drawLabel(56, n.be, '#f59e0b', 'Fe-56', 6, -8);
+    if (T.reg && 56 >= view.aMin && 56 <= view.aMax) {
+      // Region labels
+      const {x:ix} = toScreen(56, 0);
+      const midL = (PAD.left + ix) / 2;
+      const midR = ix + (PAD.left+pw - ix)/2;
+      ctx.font = '9px JetBrains Mono';
+      ctx.textAlign = 'center';
+      if (view.aMin < 40) { ctx.fillStyle='rgba(52,211,153,0.5)'; ctx.fillText('← FUSION', midL, PAD.top+14); }
+      if (view.aMax > 70) { ctx.fillStyle='rgba(251,146,60,0.5)'; ctx.fillText('FISSION →', midR, PAD.top+14); }
+    }
+  }
+
+  if (T.lead) {
+    const n207 = DATA.find(d=>d.a===207);
+    if (n207) drawLabel(207, n207.be, '#60a5fa', 'Pb-207', -6, -8);
+    const n208 = DATA.find(d=>d.a===208);
+    if (n208 && (view.aMax - view.aMin) < 60) drawLabel(208, n208.be, '#93c5fd', 'Pb-208', 6, 10);
+  }
+
+  if (T.uran) {
+    const u235 = DATA.find(d=>d.a===235);
+    const pu239 = DATA.find(d=>d.a===239);
+    if (u235)  drawLabel(235, u235.be,  '#f87171', 'U-235',  6, -8);
+    if (pu239) drawLabel(239, pu239.be, '#fca5a5', 'Pu-239', 6,  12);
+
+    // Decay arrow U-235 → Pb-207
+    if (T.lead && u235) {
+      const s1 = toScreen(235, u235.be);
+      const s2 = toScreen(207, DATA.find(d=>d.a===207).be);
+      if (s1.x > PAD.left && s2.x > PAD.left && s1.x < PAD.left+pw && s2.x < PAD.left+pw) {
+        ctx.strokeStyle = 'rgba(248,113,113,0.25)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4,3]);
+        ctx.beginPath(); ctx.moveTo(s1.x-8, s1.y); ctx.lineTo(s2.x+8, s2.y); ctx.stroke();
+        ctx.setLineDash([]);
+        // arrowhead
+        const ang = Math.atan2(s2.y-s1.y, s2.x-s1.x);
+        ctx.fillStyle = 'rgba(248,113,113,0.35)';
+        ctx.beginPath();
+        ctx.moveTo(s2.x+8, s2.y);
+        ctx.lineTo(s2.x+8 - 9*Math.cos(ang-0.4), s2.y - 9*Math.sin(ang-0.4));
+        ctx.lineTo(s2.x+8 - 9*Math.cos(ang+0.4), s2.y - 9*Math.sin(ang+0.4));
+        ctx.closePath(); ctx.fill();
+        // label midpoint
+        const mx = (s1.x+s2.x)/2, my = (s1.y+s2.y)/2 - 10;
+        if (mx > PAD.left && mx < PAD.left+pw) {
+          ctx.font='9px JetBrains Mono'; ctx.textAlign='center';
+          ctx.fillStyle='rgba(248,113,113,0.45)';
+          ctx.fillText('decay chain', mx, my);
+        }
+      }
+    }
+  }
+
+  // He-4 label
+  if (DATA.find(d=>d.a===4) && view.aMin < 10) {
+    const n = DATA.find(d=>d.a===4);
+    drawLabel(4, n.be, '#a78bfa', 'He-4', 8, -8);
+  }
+
+  // Ni-62 label if zoomed in to that region
+  if ((view.aMax - view.aMin) < 40 && 62 >= view.aMin && 62 <= view.aMax) {
+    const n = DATA.find(d=>d.a===62);
+    if (n) drawLabel(62, n.be, '#fbbf24', 'Ni-62', 6, -8);
+  }
+
+  // Magic number labels
+  if (T.magic) {
+    const magicNames = {4:'He-4\n(2,2)', 16:'O-16\n(8,8)', 40:'Ca-40\n(20,20)', 48:'Ca-48\n(20,28)', 120:'Sn-120\n(50)', 208:'Pb-208\n(82,126)'};
+    ctx.font = '8px JetBrains Mono';
+    ctx.fillStyle = 'rgba(251,146,60,0.5)';
+    ctx.textAlign = 'center';
+    for (const ma of MAGIC_A) {
+      if (ma >= view.aMin && ma <= view.aMax && !labeledA.has(ma)) {
+        const {x} = toScreen(ma, 0);
+        ctx.fillText('✦', x, PAD.top + ph - 4);
+      }
+    }
+  }
+
+  ctx.restore(); // end clip
+
+  // ── Axes ──────────────────────────────────────────────────────────────
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(PAD.left, PAD.top);
+  ctx.lineTo(PAD.left, PAD.top+ph);
+  ctx.lineTo(PAD.left+pw, PAD.top+ph);
+  ctx.stroke();
+
+  // Y tick labels
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px JetBrains Mono';
+  ctx.textAlign = 'right';
+  const beTickStep = (view.beMax - view.beMin) > 5 ? 1 : 0.5;
+  for (let be = Math.ceil(view.beMin/beTickStep)*beTickStep; be <= view.beMax; be += beTickStep) {
+    const {y} = toScreen(view.aMin, be);
+    if (y < PAD.top || y > PAD.top+ph) continue;
+    ctx.fillText(be.toFixed(beTickStep<1?1:0), PAD.left-7, y+4);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.left-4,y); ctx.lineTo(PAD.left,y); ctx.stroke();
+  }
+
+  // X tick labels
+  ctx.fillStyle = '#64748b';
+  ctx.textAlign = 'center';
+  for (let a = Math.ceil(view.aMin/aStep)*aStep; a <= view.aMax; a += aStep) {
+    const {x} = toScreen(a, 0);
+    if (x < PAD.left || x > PAD.left+pw) continue;
+    ctx.fillText(a, x, PAD.top+ph+16);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x,PAD.top+ph); ctx.lineTo(x,PAD.top+ph+4); ctx.stroke();
+  }
+
+  // Axis titles
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px JetBrains Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('Mass Number  A', PAD.left+pw/2, H-6);
+
+  ctx.save();
+  ctx.translate(13, PAD.top+ph/2);
+  ctx.rotate(-Math.PI/2);
+  const yLbl = T.pot ? 'Potential Energy / nucleon  (arb. units)' : 'Binding Energy / nucleon  (MeV)';
+  ctx.fillText(yLbl, 0, 0);
+  ctx.restore();
+
+  // Zoom info
+  if (view.aMax - view.aMin < 200) {
+    ctx.fillStyle = 'rgba(96,165,250,0.4)';
+    ctx.font = '9px JetBrains Mono';
+    ctx.textAlign = 'right';
+    ctx.fillText(`A: ${Math.round(view.aMin)}–${Math.round(view.aMax)}`, PAD.left+pw-4, PAD.top+12);
+  }
+}
+
+// ── Interaction ───────────────────────────────────────────────────────────
+function canvasCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  const dpr  = window.devicePixelRatio || 1;
+  const sx = (e.clientX - rect.left);
+  const sy = (e.clientY - rect.top);
+  return {sx, sy};
+}
+
+// Scroll to zoom centered on mouse
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const {sx, sy} = canvasCoords(e);
+  const {a: aCenter, be: beCenter} = fromScreen(sx, sy);
+  const factor = e.deltaY < 0 ? 1.25 : 0.8;
+  const aSpan  = (view.aMax  - view.aMin)  / factor;
+  const beSpan = (view.beMax - view.beMin) / factor;
+  const aFrac  = (sx - PAD.left) / (canvas.getBoundingClientRect().width - PAD.left - PAD.right);
+  const beFrac = (sy - PAD.top)  / (canvas.getBoundingClientRect().height - PAD.top - PAD.bottom);
+  view.aMin  = aCenter - aFrac  * aSpan;
+  view.aMax  = aCenter + (1-aFrac)  * aSpan;
+  view.beMin = beCenter - (T.pot ? (1-beFrac) : beFrac) * beSpan;
+  view.beMax = beCenter + (T.pot ? beFrac : (1-beFrac)) * beSpan;
+  clampView();
+  draw();
+}, {passive:false});
+
+// Drag to pan
+canvas.addEventListener('mousedown', e => {
+  isPanning = true;
+  panStart = canvasCoords(e);
+  panView = {...view};
+  canvas.classList.add('panning');
+});
+
+window.addEventListener('mousemove', e => {
+  if (isPanning) {
+    const {sx, sy} = canvasCoords(e);
+    const rect = canvas.getBoundingClientRect();
+    const pw = rect.width - PAD.left - PAD.right;
+    const ph = rect.height - PAD.top - PAD.bottom;
+    const dA  = -(sx - panStart.sx) / pw * (panView.aMax  - panView.aMin);
+    const dBE =  (sy - panStart.sy) / ph * (panView.beMax - panView.beMin) * (T.pot ? -1 : 1);
+    view.aMin  = panView.aMin  + dA;
+    view.aMax  = panView.aMax  + dA;
+    view.beMin = panView.beMin + dBE;
+    view.beMax = panView.beMax + dBE;
+    clampView();
+    draw();
+  } else {
+    handleTooltip(e);
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  isPanning = false;
+  canvas.classList.remove('panning');
+});
+
+// Double-click reset
+canvas.addEventListener('dblclick', () => resetView());
+
+// Touch support
+let lastTouchDist = null;
+let lastTouchMid  = null;
+
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) {
+    lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    lastTouchMid  = { x: (e.touches[0].clientX + e.touches[1].clientX)/2, y: (e.touches[0].clientY + e.touches[1].clientY)/2 };
+  } else if (e.touches.length === 1) {
+    isPanning = true;
+    panStart = { sx: e.touches[0].clientX - canvas.getBoundingClientRect().left, sy: e.touches[0].clientY - canvas.getBoundingClientRect().top };
+    panView = {...view};
+  }
+}, {passive:true});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (e.touches.length === 2) {
+    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const factor = dist / lastTouchDist;
+    zoomStep(factor);
+    lastTouchDist = dist;
+  } else if (e.touches.length === 1 && isPanning) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.touches[0].clientX - rect.left;
+    const sy = e.touches[0].clientY - rect.top;
+    const pw = rect.width - PAD.left - PAD.right;
+    const ph = rect.height - PAD.top - PAD.bottom;
+    const dA  = -(sx - panStart.sx) / pw * (panView.aMax - panView.aMin);
+    const dBE =  (sy - panStart.sy) / ph * (panView.beMax - panView.beMin) * (T.pot ? -1 : 1);
+    view.aMin  = panView.aMin  + dA;
+    view.aMax  = panView.aMax  + dA;
+    view.beMin = panView.beMin + dBE;
+    view.beMax = panView.beMax + dBE;
+    clampView();
+    draw();
+  }
+}, {passive:false});
+
+canvas.addEventListener('touchend', () => { isPanning = false; lastTouchDist = null; });
+
+// ── Tooltip ───────────────────────────────────────────────────────────────
+function handleTooltip(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  if (sx < PAD.left || sx > rect.width - PAD.right || sy < PAD.top || sy > rect.height - PAD.bottom) {
+    tip.style.display = 'none'; return;
+  }
+  const {a} = fromScreen(sx, sy);
+  let nearest = null, minD = Infinity;
+  for (const n of DATA) {
+    const {x} = toScreen(n.a, n.be);
+    const d = Math.abs(sx - x);
+    if (d < minD) { minD = d; nearest = n; }
+  }
+  if (nearest && minD < 12) {
+    document.getElementById('tn').textContent  = nearest.s;
+    document.getElementById('ta').textContent  = `Mass number A = ${nearest.a}`;
+    document.getElementById('tb').textContent  = `${nearest.be.toFixed(3)} MeV/nucleon`;
+    document.getElementById('tnt').textContent = nearest.note || '';
+    tip.style.display = 'block';
+    let tx = sx + 14, ty = sy - 10;
+    if (tx + 170 > rect.width) tx = sx - 175;
+    if (ty < 0) ty = 4;
+    tip.style.left = tx + 'px';
+    tip.style.top  = ty + 'px';
+  } else {
+    tip.style.display = 'none';
+  }
+}
+
+canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+
+// ── Utility ───────────────────────────────────────────────────────────────
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── Resize ────────────────────────────────────────────────────────────────
+function resize() {
+  const dpr  = window.devicePixelRatio || 1;
+  const rect = wrap.getBoundingClientRect();
+  const W    = rect.width - 32;
+  canvas.width  = W * dpr;
+  canvas.height = 480 * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = '480px';
+  ctx.scale(dpr, dpr);
+  draw();
+}
+
+window.addEventListener('resize', resize);
+resize();
+</script>
+</body>
+</html>
